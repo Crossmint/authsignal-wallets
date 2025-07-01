@@ -3,32 +3,52 @@
 import { createAuthsignal } from "@/app/lib/authsignal-client";
 import { useState } from "react";
 
+type ApiError = {
+  error?: string;
+};
+
+type WalletData = {
+  walletAddress: string;
+  usdcBalance: string;
+};
+
+type AuthData = {
+  userId: string;
+  token: string;
+  isEnrolled: boolean;
+  hasSmsEnrolled: boolean;
+};
+
+type UserData = AuthData & ApiError & WalletData;
+
+type ValidationData = {
+  success: boolean;
+  state: string;
+  userId: string;
+} & ApiError &
+  WalletData;
+
 export default function SMSAuth() {
   const [currentStep, setCurrentStep] = useState("phone-input");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [userData, setUserData] = useState<{
-    userId: string;
-    isEnrolled: boolean;
-    hasSmsEnrolled: boolean;
-    token: string;
-  } | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   const sendSMS = async () => {
     setErrorMessage("");
     setLoading(true);
 
     try {
-      // Get token from server
+      // get token from server
       const response = await fetch("/api/auth/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phoneNumber }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as UserData;
       if (data.error) {
         setErrorMessage(data.error);
         return;
@@ -75,7 +95,7 @@ export default function SMSAuth() {
         return;
       }
 
-      // Validate with server
+      // validate with server
       const response = await fetch("/api/auth/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,10 +105,18 @@ export default function SMSAuth() {
         }),
       });
 
-      const { success, error } = await response.json();
-      if (error || !success) {
-        setErrorMessage(error || "Validation failed");
+      const data = (await response.json()) as ValidationData;
+      if (data.error || !data.success) {
+        setErrorMessage(data.error || "Validation failed");
         return;
+      }
+
+      if (userData) {
+        setUserData({
+          ...userData,
+          walletAddress: data.walletAddress,
+          usdcBalance: data.usdcBalance,
+        });
       }
 
       setCurrentStep("success");
@@ -99,7 +127,7 @@ export default function SMSAuth() {
     }
   };
 
-  // Reset everything
+  // reset
   const startOver = () => {
     setCurrentStep("phone-input");
     setPhoneNumber("");
@@ -110,7 +138,7 @@ export default function SMSAuth() {
 
       return (
       <div className="max-w-md mx-auto p-8 bg-white rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold text-center mb-8 text-gray-900">
+        <h1 className="text-2xl font-bold text-center mb-8 text-black">
           SMS Authentication
         </h1>
 
@@ -126,7 +154,7 @@ export default function SMSAuth() {
           <div>
             <label
               htmlFor="phoneNumber"
-              className="block text-sm font-bold mb-2 text-gray-800"
+              className="block text-sm font-bold mb-2 text-black"
             >
               Phone Number (with country code)
             </label>
@@ -136,9 +164,9 @@ export default function SMSAuth() {
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="+1234567890"
-              className="w-full p-3 border-2 rounded-lg text-lg text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+              className="w-full p-3 border-2 rounded-lg text-lg text-black"
             />
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-black mt-1">
               We&apos;ll create an account if you&apos;re new, or sign you in if
               you exist
             </p>
@@ -158,10 +186,10 @@ export default function SMSAuth() {
       {currentStep === "code-input" && (
         <div className="space-y-4">
                       <div className="text-center">
-              <p className="text-gray-800 mb-4">
+              <p className="text-black mb-4">
                 We sent a code to <strong>{phoneNumber}</strong>
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-black">
                 {userData?.hasSmsEnrolled
                   ? "Sign-in code"
                   : "New account enrollment"}
@@ -169,7 +197,7 @@ export default function SMSAuth() {
             </div>
 
                       <div>
-              <label htmlFor="otpCode" className="block text-sm font-bold mb-2 text-gray-800">
+              <label htmlFor="otpCode" className="block text-sm font-bold mb-2 text-black">
                 Enter the 6-digit code
               </label>
               <input
@@ -179,7 +207,7 @@ export default function SMSAuth() {
                 onChange={(e) => setOtpCode(e.target.value)}
                 placeholder="123456"
                 maxLength={6}
-                className="w-full p-3 border-2 rounded-lg text-center text-2xl font-mono text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                className="w-full p-3 border-2 rounded-lg text-center text-2xl font-mono text-black"
               />
             </div>
 
@@ -207,13 +235,21 @@ export default function SMSAuth() {
           <h2 className="text-2xl font-bold text-green-600">
             Authentication Successful!
           </h2>
-          <p className="text-gray-800">
+          <p className="text-black">
             User <strong>{userData?.userId}</strong> is now authenticated with
             SMS OTP!
             <br />
-            {userData?.hasSmsEnrolled
-              ? "Successfully signed in"
-              : "Account created & phone enrolled"}
+            <p>
+              {userData?.hasSmsEnrolled
+                ? "Successfully signed in"
+                : "Account created & phone enrolled"}
+            </p>
+            <p>
+              Wallet address: <strong>{userData?.walletAddress}</strong>
+            </p>
+            <p>
+              USDC balance: <strong>{userData?.usdcBalance}</strong>
+            </p>
           </p>
           <button
             type="button"
