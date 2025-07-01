@@ -13,12 +13,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use phone number as userId
-    const userId = phoneNumber.replace(/\+/g, "").replace(/\s/g, "");
-
-    // Use "enroll" action for new users - this works for both new and existing
+    // use "enroll" action for new users - this works for both new and existing
     const response = await authsignalServer.track({
-      userId,
+      userId: phoneNumber, // use phone number as userId
       action: "enroll",
       attributes: {
         phoneNumber,
@@ -29,8 +26,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       token: response.token,
       isEnrolled: response.isEnrolled || false,
-      hasSmsEnrolled: false, // Client will determine this
-      userId,
+      hasSmsEnrolled: false, // client will determine this
+      userId: phoneNumber,
     });
   } catch (error) {
     console.error("Auth init error:", error);
